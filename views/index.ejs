@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Noog - Job Listing Search Engine</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23bb86fc'/%3E%3Cpath d='M30 30h40v10H30zM30 50h40v10H30zM30 70h40v10H30z' fill='%23121212'/%3E%3Cpath d='M80 35L90 50 80 65' fill='none' stroke='%23121212' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+    <div id="menu-toggle">☰</div>
+    <div id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="#" data-view="scraper">Scraper</a></li>
+                <li><a href="#" data-view="settings">Settings</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="container">
+        <header>
+            <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="50" height="50">
+                <rect width="100" height="100" rx="20" fill="#bb86fc"/>
+                <path d="M30 30h40v10H30zM30 50h40v10H30zM30 70h40v10H30z" fill="#121212"/>
+                <path d="M80 35L90 50 80 65" fill="none" stroke="#121212" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h1>Noog</h1>
+        </header>
+        
+        <div id="scraper-view" class="view">
+            <h2>Job Scraper</h2>
+            <form id="scrapeForm">
+                <button type="submit" id="scrapeBtn">Scrape and Send Email</button>
+            </form>
+            
+            <div id="loadingAnimation" class="loading-animation" style="display: none;">
+                <div class="spinner"></div>
+                <p id="loadingMessage">Scraping in progress...</p>
+            </div>
+
+            <h2>Job Listings</h2>
+            <div id="listingsContainer" class="card-container">
+                <% if (listings && listings.length > 0) { %>
+                    <% listings.forEach((listing) => { %>
+                        <div class="card" data-id="<%= listing.id %>">
+                            <h3><%= listing.title || 'No Title' %></h3>
+                            <a href="<%= listing.link || '#' %>" target="_blank"><%= listing.link || 'No Link' %></a>
+                            <p><%= listing.snippet || 'No Description' %></p>
+                            <p>Job Board: <%= listing.jobBoard %>, Search Term: <%= listing.searchTerm %>, Location: <%= listing.location || 'Unknown Location' %></p>
+                        </div>
+                    <% }); %>
+                <% } else { %>
+                    <p>No listings found.</p>
+                <% } %>
+            </div>
+        </div>
+
+        <div id="settings-view" class="view" style="display: none;">
+            <h2>Settings</h2>
+            <form id="configForm" action="/update-config" method="POST">
+                <label for="search_terms">Search Terms (comma separated):</label>
+                <textarea name="search_terms" id="search_terms"><%= config.search_terms.join(',') %></textarea>
+
+                <label for="locations">Locations (comma separated):</label>
+                <textarea name="locations" id="locations"><%= config.locations.join(', ') %></textarea>
+
+                <div class="collapsible-section">
+                    <h3 class="collapsible">Job Boards <span class="expand-text">Expand</span></h3>
+                    <div class="content">
+                        <div id="jobBoardsContainer">
+                            <% if (config.job_boards && config.job_boards.length > 0) { %>
+                                <div class="job-board-item">
+                                    <input type="text" name="job_boards[0][name]" value="<%= config.job_boards[0].name %>" placeholder="Job Board URL" required>
+                                    <input type="text" name="job_boards[0][url_pattern]" value="<%= config.job_boards[0].url_pattern %>" placeholder="URL Pattern">
+                                </div>
+                                <% if (config.job_boards.length > 1) { %>
+                                    <div class="hidden-boards">
+                                        <% for (let i = 1; i < config.job_boards.length; i++) { %>
+                                            <div class="job-board-item">
+                                                <input type="text" name="job_boards[<%= i %>][name]" value="<%= config.job_boards[i].name %>" placeholder="Job Board URL" required>
+                                                <input type="text" name="job_boards[<%= i %>][url_pattern]" value="<%= config.job_boards[i].url_pattern %>" placeholder="URL Pattern">
+                                                <button type="button" onclick="removeJobBoard(this)">Remove</button>
+                                            </div>
+                                        <% } %>
+                                    </div>
+                                <% } %>
+                            <% } else { %>
+                                <div class="job-board-item">
+                                    <input type="text" name="job_boards[0][name]" placeholder="Job Board URL" required>
+                                    <input type="text" name="job_boards[0][url_pattern]" placeholder="URL Pattern">
+                                </div>
+                            <% } %>
+                        </div>
+                        <button type="button" onclick="addJobBoard()">Add Job Board</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="updateConfigBtn">Update Config</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+    <div id="installPrompt" class="install-prompt" style="display: none;">
+        <p>Install this app on your device for a better experience!</p>
+        <button id="installBtn">Install</button>
+    </div>
+
+    <script>
+        const ws = new WebSocket('ws://' + window.location.host);
+        const scrapeBtn = document.getElementById('scrapeBtn');
+        const updateConfigBtn = document.getElementById('updateConfigBtn');
+        const loadingAnimation = document.getElementById('loadingAnimation');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const toastContainer = document.getElementById('toastContainer');
+        let deferredPrompt;
+
+        function updateScraperUI(isRunning, progress) {
+            if (isRunning) {
+                scrapeBtn.disabled = true;
+                updateConfigBtn.disabled = true;
+                loadingAnimation.style.display = 'block';
+                loadingMessage.textContent = progress || 'Scraping in progress...';
+            } else {
+                scrapeBtn.disabled = false;
+                updateConfigBtn.disabled = false;
+                loadingAnimation.style.display = 'none';
+            }
+        }
+
+        // Check scraper status on page load
+        window.addEventListener('load', function() {
+            updateScraperUI(<%= isScraperRunning %>, '<%= scraperProgress %>');
+            
+            // Periodically check scraper status
+            setInterval(function() {
+                fetch('/scraper-status')
+                    .then(response => response.json())
+                    .then(data => {
+                        updateScraperUI(data.isRunning, data.progress);
+                    })
+                    .catch(error => console.error('Error fetching scraper status:', error));
+            }, 5000);
+        });
+        
+        ws.onmessage = function(event) {
+            const update = JSON.parse(event.data);
+            switch (update.type) {
+                case 'new_listing':
+                    addNewListing(update.data);
+                    break;
+                case 'scrapeStart':
+                    updateScraperUI(true, 'Scraping in progress...');
+                    break;
+                case 'progress':
+                    updateProgress(update.message);
+                    break;
+                case 'scrapeComplete':
+                    updateScraperUI(false);
+                    showToast(update.message, 'success');
+                    break;
+                case 'scrapeError':
+                    updateScraperUI(false);
+                    handleError(update.message);
+                    break;
+            }
+        };
+
+        function addNewListing(listing) {
+            const listingsContainer = document.getElementById('listingsContainer');
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.id = `${listing.link}_${listing.jobBoard}_${listing.searchTerm}`;
+            card.innerHTML = `
+                <h3>${listing.title || 'No Title'}</h3>
+                <a href="${listing.link || '#'}" target="_blank">${listing.link || 'No Link'}</a>
+                <p>${listing.snippet || 'No Description'}</p>
+                <p>Job Board: ${listing.jobBoard}, Search Term: ${listing.searchTerm}, Location: ${listing.location || 'Unknown Location'}</p>
+            `;
+            listingsContainer.insertBefore(card, listingsContainer.firstChild);
+        }
+
+        function updateProgress(message) {
+            loadingMessage.textContent = message;
+        }
+
+        function handleError(message) {
+            showToast('Error: ' + message, 'error');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        toastContainer.removeChild(toast);
+                    }, 300);
+                }, 3000);
+            }, 100);
+        }
+
+        document.getElementById('scrapeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch('/scrape-and-send', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        showToast('Error: ' + data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('An error occurred. Please check the console for details.', 'error');
+                });
+        });
+
+        // Dynamic job board management
+        function addJobBoard() {
+            const jobBoardsContainer = document.getElementById('jobBoardsContainer');
+            const index = jobBoardsContainer.children.length;
+            const div = document.createElement('div');
+            div.className = 'job-board-item';
+            div.innerHTML = `
+                <input type="text" name="job_boards[${index}][name]" placeholder="Job Board URL" required>
+                <input type="text" name="job_boards[${index}][url_pattern]" placeholder="URL Pattern">
+                <button type="button" onclick="removeJobBoard(this)">Remove</button>
+            `;
+            jobBoardsContainer.appendChild(div);
+        }
+
+        function removeJobBoard(button) {
+            const jobBoardsContainer = document.getElementById('jobBoardsContainer');
+            jobBoardsContainer.removeChild(button.parentElement);
+        }
+
+        // Collapsible section functionality
+        document.querySelectorAll('.collapsible').forEach(button => {
+            button.addEventListener('click', function() {
+                this.classList.toggle('active');
+                var content = this.nextElementSibling;
+                var expandText = this.querySelector('.expand-text');
+                if (content.style.display === "block") {
+                    content.style.display = "none";
+                    expandText.textContent = "Expand";
+                } else {
+                    content.style.display = "block";
+                    expandText.textContent = "Collapse";
+                }
+                var hiddenBoards = content.querySelector('.hidden-boards');
+                if (hiddenBoards) {
+                    hiddenBoards.style.display = content.style.display;
+                }
+            });
+        });
+
+        // PWA installation
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').style.display = 'block';
+        });
+
+        document.getElementById('installBtn').addEventListener('click', () => {
+            document.getElementById('installPrompt').style.display = 'none';
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+
+        // Service Worker and Push Notification Registration
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                        
+                        // Explicitly request notification permission
+                        return Notification.requestPermission().then(permission => {
+                            if (permission !== 'granted') {
+                                throw new Error('Notification permission not granted');
+                            }
+                            return registration.pushManager.getSubscription();
+                        });
+                    })
+                    .then(subscription => {
+                        if (subscription) {
+                            console.log('Already subscribed', subscription);
+                            return subscription;
+                        }
+                        // Subscribe for push notifications
+                        return navigator.serviceWorker.ready.then(registration => {
+                            return registration.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: urlBase64ToUint8Array('<%= process.env.VAPID_PUBLIC_KEY %>')
+                            });
+                        });
+                    })
+                    .then(subscription => {
+                        console.log('Push notification subscription:', subscription);
+                        // Send subscription to server
+                        return fetch('/subscribe', {
+                            method: 'POST',
+                            body: JSON.stringify(subscription),
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to subscribe to push notifications');
+                        }
+                        console.log('Push notification subscription successful');
+                    })
+                    .catch(err => {
+                        console.error('ServiceWorker registration or push subscription failed: ', err);
+                    });
+            });
+        }
+
+        // Slide-out menu functionality
+        document.getElementById('menu-toggle').addEventListener('click', function() {
+            document.body.classList.toggle('menu-open');
+        });
+
+        document.querySelectorAll('#sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const viewToShow = this.getAttribute('data-view');
+                document.querySelectorAll('.view').forEach(view => {
+                    view.style.display = 'none';
+                });
+                document.getElementById(`${viewToShow}-view`).style.display = 'block';
+                document.body.classList.remove('menu-open');
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const menuToggle = document.getElementById('menu-toggle');
+            if (!sidebar.contains(event.target) && event.target !== menuToggle) {
+                document.body.classList.remove('menu-open');
+            }
+        });
+
+        // Prevent clicks inside the sidebar from closing the menu
+        document.getElementById('sidebar').addEventListener('click', function(event) {
+            event.stopPropagation();
+        });
+    </script>
+</body>
+</html>

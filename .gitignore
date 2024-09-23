@@ -1,0 +1,6 @@
+.env
+config.json
+node_modules
+data
+chroma.log
+package-lock.json
