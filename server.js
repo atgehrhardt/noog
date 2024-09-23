@@ -10,7 +10,6 @@ const net = require('net');
 const http = require('http');
 const WebSocket = require('ws');
 const cron = require('node-cron');
-const webpush = require('web-push');
 require('dotenv').config();
 
 const app = express();
@@ -27,13 +26,6 @@ let config = JSON.parse(fs.readFileSync(configPath));
 
 const chromaDBPath = path.resolve(__dirname, './data');
 
-webpush.setVapidDetails(
-  'mailto:your-email@example.com',
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
-
-let pushSubscriptions = [];
 let isScraperRunning = false;
 let scraperProgress = '';
 
@@ -436,13 +428,6 @@ app.get('/scraper-status', (req, res) => {
     isRunning: isScraperRunning,
     progress: scraperProgress
   });
-});
-
-app.post('/subscribe', (req, res) => {
-  const subscription = req.body;
-  pushSubscriptions.push(subscription);
-  console.log('New push subscription:', subscription);
-  res.status(201).json({});
 });
 
 (async () => {
