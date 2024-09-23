@@ -16,34 +16,9 @@ services:
       - SMTP_PASS=${SMTP_PASS}
       - SMTP_FROM=${SMTP_FROM}
       - REPORT_EMAIL=${REPORT_EMAIL}
-      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
-      - VAPID_PRIVATE_KEY=f${VAPID_PRIVATE_KEY}
       - PROXY_LIST=${PROXY_LIST}
     networks:
       - noog_prod_network
-
-  app-dev:
-    build: .
-    restart: always
-    ports:
-      - "0.0.0.0:5628:5627"
-    volumes:
-      - dev_data:/usr/src/app/data
-      - .env:/usr/src/app/.env
-      - ./config.json:/usr/src/app/config.json
-    environment:
-      - SMTP_HOST=smtp.gmail.com
-      - SMTP_PORT=587
-      - SMTP_SECURE=false
-      - SMTP_USER=atgehrhardt@gmail.com
-      - SMTP_PASS=kjyk qatu ljzp yitg
-      - SMTP_FROM=atgehrhardt@gmail.com
-      - REPORT_EMAIL=atgehrhardt@gmail.com
-      - VAPID_PUBLIC_KEY=BDagtUlGXTRGeRMNxdZwkOlfU7iBflr8QMv9EtsbabrVqsiKUKUXga7taSi1K78LTWhmQBEYgERWrJLl448UHnw
-      - VAPID_PRIVATE_KEY=fHBoFBDddAqJAIQnMJqh_X-uzt3tN2obJu41Jr4lNgc
-      - PROXY_LIST=http://154.194.16.117:6036|pihpkgvl|lmqfms2wn56h,http://103.130.178.147:5811|pihpkgvl|lmqfms2wn56h,http://103.210.12.109:6037|pihpkgvl|lmqfms2wn56h
-    networks:
-      - noog_dev_network
 
 volumes:
   prod_data:
