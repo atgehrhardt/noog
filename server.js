@@ -363,6 +363,27 @@ cron.schedule('*/60 * * * *', () => {
   scrapeAndSend();
 });
 
+async function updateListingStatus(id, status) {
+  const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
+  const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
+  
+  await collection.update({
+    ids: [id],
+    metadatas: [{ status: status }]
+  });
+}
+
+app.post('/update-listing-status', async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    await updateListingStatus(id, status);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating listing status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update listing status' });
+  }
+});
+
 app.get('/', async (req, res) => {
   try {
     const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
@@ -376,7 +397,8 @@ app.get('/', async (req, res) => {
       snippet: result.documents[index],
       jobBoard: result.metadatas[index].jobBoard,
       searchTerm: result.metadatas[index].searchTerm,
-      location: result.metadatas[index].location || 'Unknown Location'
+      location: result.metadatas[index].location || 'Unknown Location',
+      status: result.metadatas[index].status || 'new'
     }));
 
     console.log(`Fetched ${listings.length} listings from the database`);
