@@ -12,23 +12,8 @@ const WebSocket = require('ws');
 const cron = require('node-cron');
 require('dotenv').config();
 
-const app = express();app.post('/update-listing-status', async (req, res) => {
-  const { id, status } = req.body;
-  try {
-    const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
-    const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
-    
-    await collection.update({
-      ids: [id],
-      metadatas: [{ status: status }]
-    });
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Error updating listing status:', error);
-    res.status(500).json({ success: false, error: 'Failed to update listing status' });
-  }
-});
+const app = express();
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -113,7 +98,7 @@ const matchesPattern = (url, pattern) => {
   return regex.test(url);
 };
 
-const chromaServer = exec(`chroma run --path ${chromaDBPath}`, (error, stdout, stderr) => {
+const chromaServer = exec(`chroma run --path ${chromaDBPath} --port 8000`, (error, stdout, stderr) => {
   if (error) {
     console.error(`Error starting ChromaDB server: ${error.message}`);
     return;
@@ -330,7 +315,8 @@ async function scrapeAndSend() {
                     link: result.link,
                     jobBoard: jobBoard,
                     searchTerm: searchTerm,
-                    location: location
+                    location: location,
+                    status: 'new'
                   }],
                   ids: [`${result.link}_${jobBoard}_${searchTerm}_${location}`]
                 });
@@ -342,7 +328,8 @@ async function scrapeAndSend() {
                     ...result,
                     jobBoard,
                     searchTerm,
-                    location
+                    location,
+                    status: 'new'
                   }
                 });
               } else {
@@ -383,23 +370,20 @@ async function updateListingStatus(id, status) {
   const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
   const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
   
-  await collection.update({
-    ids: [id],
-    metadatas: [{ status: status }]
-  });
+  const existingEntry = await collection.get({ ids: [id] });
+  if (existingEntry.ids.length > 0) {
+    const updatedMetadata = { ...existingEntry.metadatas[0], status: status };
+    await collection.update({
+      ids: [id],
+      metadatas: [updatedMetadata]
+    });
+  }
 }
 
 app.post('/update-listing-status', async (req, res) => {
   const { id, status } = req.body;
   try {
-    const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
-    const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
-    
-    await collection.update({
-      ids: [id],
-      metadatas: [{ status: status }]
-    });
-    
+    await updateListingStatus(id, status);
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating listing status:', error);
@@ -421,14 +405,22 @@ app.get('/', async (req, res) => {
       jobBoard: result.metadatas[index].jobBoard,
       searchTerm: result.metadatas[index].searchTerm,
       location: result.metadatas[index].location || 'Unknown Location',
-      status: result.metadatas[index].status || 'new'
+      status: result.metadatas[index].status || 'new'  // Use 'new' as default if status is not set
     }));
 
     console.log(`Fetched ${listings.length} listings from the database`);
 
+    // Group listings by status
+    const groupedListings = {
+      new: listings.filter(listing => listing.status === 'new'),
+      applied: listings.filter(listing => listing.status === 'applied'),
+      interviewing: listings.filter(listing => listing.status === 'interviewing'),
+      hidden: listings.filter(listing => listing.status === 'hidden')
+    };
+
     res.render('index', {
       config,
-      listings,
+      groupedListings,
       isScraperRunning,
       scraperProgress
     });
@@ -436,7 +428,7 @@ app.get('/', async (req, res) => {
     console.error('Error fetching listings:', error);
     res.render('index', {
       config,
-      listings: [],
+      groupedListings: { new: [], applied: [], interviewing: [], hidden: [] },
       error: 'Error fetching listings',
       isScraperRunning,
       scraperProgress,
