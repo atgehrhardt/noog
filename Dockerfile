@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     wget \
     gnupg \
+    tzdata \  # Add tzdata package
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     # Playwright dependencies
@@ -30,6 +31,10 @@ RUN apt-get update && apt-get install -y \
         libxfixes3 \
         libxrandr2 \
     && rm -rf /var/lib/apt/lists/*
+
+# Set the timezone
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Set the working directory in the container
 WORKDIR /usr/src/app

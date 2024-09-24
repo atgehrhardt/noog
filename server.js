@@ -358,7 +358,7 @@ async function scrapeAndSend() {
   }
 }
 
-cron.schedule('*/60 * * * *', () => {
+cron.schedule('0 10,15 * * *', () => {
   console.log('Running scheduled scrape');
   scrapeAndSend();
 });
