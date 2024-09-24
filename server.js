@@ -12,7 +12,23 @@ const WebSocket = require('ws');
 const cron = require('node-cron');
 require('dotenv').config();
 
-const app = express();
+const app = express();app.post('/update-listing-status', async (req, res) => {
+  const { id, status } = req.body;
+  try {
+    const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
+    const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
+    
+    await collection.update({
+      ids: [id],
+      metadatas: [{ status: status }]
+    });
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating listing status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update listing status' });
+  }
+});
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -376,7 +392,14 @@ async function updateListingStatus(id, status) {
 app.post('/update-listing-status', async (req, res) => {
   const { id, status } = req.body;
   try {
-    await updateListingStatus(id, status);
+    const chromaClient = new ChromaClient({ basePath: 'http://localhost:8000' });
+    const collection = await chromaClient.getOrCreateCollection({ name: 'job_listings' });
+    
+    await collection.update({
+      ids: [id],
+      metadatas: [{ status: status }]
+    });
+    
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating listing status:', error);

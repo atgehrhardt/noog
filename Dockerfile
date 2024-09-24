@@ -11,10 +11,9 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     wget \
     gnupg \
-    tzdata \  # Add tzdata package
+    tzdata \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
-    # Playwright dependencies
     && npx playwright install-deps \
     && apt-get install -y \
         libnss3 \
@@ -52,8 +51,7 @@ RUN npx playwright install
 COPY . .
 
 # Upgrade pip and install chromadb
-RUN pip3 install --upgrade pip && \
-    pip3 install chromadb
+RUN pip3 install --upgrade pip && pip3 install chromadb
 
 # Expose the ports the app runs on
 EXPOSE 5627

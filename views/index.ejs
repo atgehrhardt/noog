@@ -70,14 +70,22 @@
             transform: rotate(45deg);
         }
 
+        .section-container {
+            margin-bottom: 30px;
+        }
+
         .section-header {
             cursor: pointer;
             display: flex;
             align-items: center;
+            background-color: #2c2c2c;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
         }
 
         .section-header:hover {
-            opacity: 0.8;
+            background-color: #3c3c3c;
         }
 
         .section-header::after {
@@ -88,6 +96,21 @@
 
         .section-header.collapsed::after {
             transform: rotate(-90deg);
+        }
+
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            max-height: 1000px; /* Adjust this value based on your needs */
+            opacity: 1;
+            overflow: hidden;
+        }
+
+        .card-container.collapsed {
+            max-height: 0;
+            opacity: 0;
         }
 
         .card-actions {
@@ -139,50 +162,58 @@
                 <p id="loadingMessage">Scraping in progress...</p>
             </div>
     
-            <h2 class="section-header" data-target="listingsContainer">New Job Listings</h2>
-            <div id="listingsContainer" class="card-container">
-                <% if (listings && listings.length > 0) { %>
-                    <% listings.forEach((listing) => { %>
-                        <div class="card" data-id="<%= listing.id %>">
-                            <h3><%= listing.title || 'No Title' %></h3>
-                            <a href="<%= listing.link || '#' %>" target="_blank"><%= listing.link || 'No Link' %></a>
-                            <p><%= listing.snippet || 'No Description' %></p>
-                            <p>Job Board: <%= listing.jobBoard %>, Search Term: <%= listing.searchTerm %>, Location: <%= listing.location || 'Unknown Location' %></p>
-                            <div class="card-actions">
-                                <div class="checkboxes">
-                                    <label class="custom-checkbox">
-                                        Applied
-                                        <input type="checkbox" class="applied-checkbox">
-                                        <span class="checkmark"></span>
-                                    </label>
-                                    <label class="custom-checkbox">
-                                        Interviewing
-                                        <input type="checkbox" class="interviewing-checkbox">
-                                        <span class="checkmark"></span>
-                                    </label>
+            <div class="section-container">
+                <h2 class="section-header" data-target="listingsContainer">New Job Listings</h2>
+                <div id="listingsContainer" class="card-container">
+                    <% if (listings && listings.length > 0) { %>
+                        <% listings.forEach((listing) => { %>
+                            <div class="card" data-id="<%= listing.id %>">
+                                <h3><%= listing.title || 'No Title' %></h3>
+                                <a href="<%= listing.link || '#' %>" target="_blank"><%= listing.link || 'No Link' %></a>
+                                <p><%= listing.snippet || 'No Description' %></p>
+                                <p>Job Board: <%= listing.jobBoard %>, Search Term: <%= listing.searchTerm %>, Location: <%= listing.location || 'Unknown Location' %></p>
+                                <div class="card-actions">
+                                    <div class="checkboxes">
+                                        <label class="custom-checkbox">
+                                            Applied
+                                            <input type="checkbox" class="applied-checkbox">
+                                            <span class="checkmark"></span>
+                                        </label>
+                                        <label class="custom-checkbox">
+                                            Interviewing
+                                            <input type="checkbox" class="interviewing-checkbox">
+                                            <span class="checkmark"></span>
+                                        </label>
+                                    </div>
+                                    <button class="hide-btn">Hide</button>
                                 </div>
-                                <button class="hide-btn">Hide</button>
                             </div>
-                        </div>
-                    <% }); %>
-                <% } else { %>
-                    <p>No listings found.</p>
-                <% } %>
+                        <% }); %>
+                    <% } else { %>
+                        <p>No listings found.</p>
+                    <% } %>
+                </div>
             </div>
     
-            <h2 class="section-header collapsed" data-target="appliedListingsContainer">Applied Job Listings</h2>
-            <div id="appliedListingsContainer" class="card-container" style="display: none;">
-                <!-- Applied listings will be moved here -->
+            <div class="section-container">
+                <h2 class="section-header collapsed" data-target="appliedListingsContainer">Applied Job Listings</h2>
+                <div id="appliedListingsContainer" class="card-container collapsed">
+                    <!-- Applied listings will be moved here -->
+                </div>
             </div>
     
-            <h2 class="section-header collapsed" data-target="interviewingListingsContainer">Interviewing Job Listings</h2>
-            <div id="interviewingListingsContainer" class="card-container" style="display: none;">
-                <!-- Interviewing listings will be moved here -->
+            <div class="section-container">
+                <h2 class="section-header collapsed" data-target="interviewingListingsContainer">Interviewing Job Listings</h2>
+                <div id="interviewingListingsContainer" class="card-container collapsed">
+                    <!-- Interviewing listings will be moved here -->
+                </div>
             </div>
     
-            <h2 class="section-header collapsed" data-target="hiddenListingsContainer">Hidden Job Listings</h2>
-            <div id="hiddenListingsContainer" class="card-container" style="display: none;">
-                <!-- Hidden listings will be moved here -->
+            <div class="section-container">
+                <h2 class="section-header collapsed" data-target="hiddenListingsContainer">Hidden Job Listings</h2>
+                <div id="hiddenListingsContainer" class="card-container collapsed">
+                    <!-- Hidden listings will be moved here -->
+                </div>
             </div>
         </div>
 
@@ -440,17 +471,19 @@
                     toggleSection(this);
                 });
             });
+
+            // Ensure the New Job Listings section is expanded by default
+            const newJobsHeader = document.querySelector('[data-target="listingsContainer"]');
+            if (newJobsHeader.classList.contains('collapsed')) {
+                toggleSection(newJobsHeader);
+            }
         });
 
         function toggleSection(header) {
             header.classList.toggle('collapsed');
             const targetId = header.getAttribute('data-target');
             const targetSection = document.getElementById(targetId);
-            if (header.classList.contains('collapsed')) {
-                targetSection.style.display = 'none';
-            } else {
-                targetSection.style.display = 'grid';
-            }
+            targetSection.classList.toggle('collapsed');
         }
 
         document.getElementById('scrapeForm').addEventListener('submit', function(e) {
@@ -526,57 +559,6 @@
                 deferredPrompt = null;
             });
         });
-
-        // Service Worker and Push Notification Registration
-        if ('serviceWorker' in navigator && 'PushManager' in window) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                        
-                        // Explicitly request notification permission
-                        return Notification.requestPermission().then(permission => {
-                            if (permission !== 'granted') {
-                                throw new Error('Notification permission not granted');
-                            }
-                            return registration.pushManager.getSubscription();
-                        });
-                    })
-                    .then(subscription => {
-                        if (subscription) {
-                            console.log('Already subscribed', subscription);
-                            return subscription;
-                        }
-                        // Subscribe for push notifications
-                        return navigator.serviceWorker.ready.then(registration => {
-                            return registration.pushManager.subscribe({
-                                userVisibleOnly: true,
-                                applicationServerKey: urlBase64ToUint8Array('<%= process.env.VAPID_PUBLIC_KEY %>')
-                            });
-                        });
-                    })
-                    .then(subscription => {
-                        console.log('Push notification subscription:', subscription);
-                        // Send subscription to server
-                        return fetch('/subscribe', {
-                            method: 'POST',
-                            body: JSON.stringify(subscription),
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Failed to subscribe to push notifications');
-                        }
-                        console.log('Push notification subscription successful');
-                    })
-                    .catch(err => {
-                        console.error('ServiceWorker registration or push subscription failed: ', err);
-                    });
-            });
-        }
 
         // Slide-out menu functionality
         document.getElementById('menu-toggle').addEventListener('click', function() {
